@@ -9,6 +9,10 @@ from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
 from models import db, User
+from flask_marshmallow import Marshmallow
+import requests
+
+
 #from models import Person
 
 app = Flask(__name__)
@@ -19,6 +23,15 @@ MIGRATE = Migrate(app, db)
 db.init_app(app)
 CORS(app)
 setup_admin(app)
+ma = Marshmallow(app)
+
+class UserSchema(ma.Schema):
+    class Meta:
+        fields = ("email")
+
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
+
 
 # Handle/serialize errors like a JSON object
 @app.errorhandler(APIException)
@@ -30,14 +43,36 @@ def handle_invalid_usage(error):
 def sitemap():
     return generate_sitemap(app)
 
-@app.route('/user', methods=['GET'])
-def handle_hello():
+@app.route('/users', methods=['GET'])
+def get_user():
+    all_users = User.query.all()
+    result = users_schema.dump(all_users)
+    return jsonify(result)
 
-    response_body = {
-        "msg": "Hello, this is your GET /user response "
+
+@app.route('/create_user', methods=['POST'])
+def create_user():
+    print(request.json)
+    return 'received'
+
+
+@app.route('/objects', methods=["GET"])
+def get_objects():
+    return requests.get('https://collectionapi.metmuseum.org/public/collection/v1/objects').json()
+
+
+@app.route('/objects/<int:id>', methods=["GET"])
+def get_objects_by_id(id):
+    result = requests.get('https://collectionapi.metmuseum.org/public/collection/v1/objects/'+ str(id)).json()
+
+    return {
+    "objectID":result["objectID"],
+    "title":result["title"],
+    "primaryImage":result["primaryImage"],
+    "objectDate": result["objectDate"]
     }
 
-    return jsonify(response_body), 200
+
 
 # this only runs if `$ python src/main.py` is executed
 if __name__ == '__main__':
